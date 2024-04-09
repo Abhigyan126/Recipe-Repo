@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover Recipes</title>
+    <style>
+      .button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.button:hover {
+    background-color: #45a049;
+}
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f3f3f3;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input[type="text"], textarea {
+            padding: 8px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .star {
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+        }
+        .star.rated {
+            filter: grayscale(0%);
+        }
+        #editFormContainer {
+            display: none;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        nav a {
+            text-decoration: none;
+            color: #333;
+            padding: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    
+
+    <h1>Discover Recipes</h1>
+    
+    <form id="searchForm">
+        <label for="searchInput">Search by Title or Ingredients:</label>
+        <input type="text" id="searchInput" name="searchInput" placeholder="Enter title or ingredient..." oninput="searchRecipes()">
+        <input type="submit" value="Search">
+    </form>
+    
+    <nav><table>
+      <tr>
+        <td><a href="insert.html" class="button">Insert Recipe</a></td>
+    </tr>
+          </table>
+  </nav>
+    <table id="recipesTable">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Alias</th>
+                <th>Ingredients</th>
+                <th>Instructions</th>
+                <th>Ratings</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <img src="img.jpg" id="starImg" style="display: none;">
+        <div id="editFormContainer">
+        <h2>Edit Recipe</h2>
+        <form id="editForm">
+            <label for="editTitle">Title:</label><br>
+            <input type="text" id="editTitle" name="editTitle" required><br>
+            <label for="editAlias">Alias:</label><br>
+            <input type="text" id="editAlias" name="editAlias" required><br>
+            <label for="editIngredients">Ingredients:</label><br>
+            <input type="text" id="editIngredients" name="editIngredients" required><br>
+            <label for="editInstructions">Instructions:</label><br>
+            <textarea id="editInstructions" name="editInstructions" rows="4" required></textarea><br>
+            <button type="submit">Save Changes</button>
+        </form>
+    </div>
+    <script>
+        async function fetchRecipes(searchValue) {
+            const response = await fetch(`/recipes?search=${encodeURIComponent(searchValue)}`);
+            const recipes = await response.json();
+            displayRecipes(recipes);
+        }
+
+        function searchRecipes() {
+            const searchValue = document.getElementById("searchInput").value.trim();
+            fetchRecipes(searchValue);
+        }
+
+        function displayRecipes(recipes) {
+            const tableBody = document.querySelector("#recipesTable tbody");
+            tableBody.innerHTML = "";
+            recipes.forEach(recipe => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${recipe.title}</td>
+                    <td>${recipe.alias}</td>
+                    <td>${recipe.ingredients.join(", ")}</td>
+                    <td>${recipe.instructions}</td>
+                    <td class="ratingCell">${recipe.ratings.toFixed(1)}</td>
+                    <td>${new Date(recipe.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <button onclick="editRecipe('${recipe._id}', '${recipe.title}', '${recipe.alias}', '${recipe.ingredients.join(', ')}', '${recipe.instructions}')">Edit</button>
+                        <button onclick="deleteRecipe('${recipe._id}')">Delete</button>
+                        <button onclick="shareRecipe('${recipe._id}')">Share</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+                const ratingCell = row.querySelector(".ratingCell");
+                const averageRating = recipe.ratings;
+                for (let i = 1; i <= 5; i++) {
+                    const starImg = document.createElement("img");
+                    starImg.src = "img.jpg";
+                    starImg.classList.add("star");
+                    starImg.dataset.rating = i;
+                    if (i <= averageRating) {
+                        starImg.classList.add("rated");
+                    }
+                    starImg.addEventListener("click", () => rateRecipe(recipe._id, i));
+                    ratingCell.appendChild(starImg);
+                }
+            });
+        }
+        async function rateRecipe(recipeId, rating) {
+            try {
+                const response = await fetch(`/recipes/${recipeId}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ rating: rating })
+                });
+                if (response.ok) {
+                    fetchRecipes(document.getElementById("searchInput").value.trim());
+                } else {
+                    console.error("Failed to rate recipe");
+                }
+            } catch (error) {
+                console.error("Failed to rate recipe:", error);
+            }
+        }
+        function editRecipe(recipeId, title, alias, ingredients, instructions) {
+            document.getElementById("editTitle").value = title;
+            document.getElementById("editAlias").value = alias;
+            document.getElementById("editIngredients").value = ingredients;
+            document.getElementById("editInstructions").value = instructions;
+            document.getElementById("editForm").onsubmit = function(event) {
+                event.preventDefault();
+                saveEditedRecipe(recipeId);
+            };
+            document.getElementById("editFormContainer").style.display = "block";
+        }
+        async function saveEditedRecipe(recipeId) {
+            const editedRecipe = {
+                title: document.getElementById("editTitle").value,
+                alias: document.getElementById("editAlias").value,
+                ingredients: document.getElementById("editIngredients").value.split(","),
+                instructions: document.getElementById("editInstructions").value
+            };
+
+            try {
+                const response = await fetch(`/recipes/${recipeId}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(editedRecipe)
+                });
+                if (response.ok) {
+                    fetchRecipes(document.getElementById("searchInput").value.trim());
+                    document.getElementById("editFormContainer").style.display = "none";
+                } else {
+                    console.error("Failed to save changes");
+                }
+            } catch (error) {
+                console.error("Failed to save changes:", error);
+            }
+        }
+        async function deleteRecipe(recipeId) {
+            if (confirm("Are you sure you want to delete this recipe?")) {
+                try {
+                    const response = await fetch(`/recipes/${recipeId}`, {
+                        method: "DELETE"
+                    });
+                    if (response.ok) {
+                        fetchRecipes(document.getElementById("searchInput").value.trim());
+                    } else {
+                        console.error("Failed to delete recipe");
+                    }
+                } catch (error) {
+                    console.error("Failed to delete recipe:", error);
+                }
+            }
+        }
+        async function shareRecipe(recipeId) {
+            try {
+                const response = await fetch(`/recipes/share/${recipeId}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Recipe shared successfully! Link: ${result.recipeLink}`);
+                } else {
+                    console.error('Failed to share recipe');
+                }
+            } catch (error) {
+                console.error('Failed to share recipe:', error);
+            }
+        }
+        fetchRecipes("");
+    </script>
+</body>
+</html>
